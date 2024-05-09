@@ -1,5 +1,6 @@
 import heapq
 import copy
+import time
 
 class TreeNode:
     def __init__(self, board, pos):
@@ -32,10 +33,8 @@ def find_path(soln):
     while next != None:
         solution_path.append(next)
         next = next.parent
-
-    print('The sequence of steps are')
-    while solution_path:
-        print(solution_path.pop().board)
+    return solution_path
+    
 
 def find_problem_operations(pos):
     i = pos[0]
@@ -69,11 +68,11 @@ def find_cost(node): #to calculate g(n)
     return node.level
     
 def find_heuristic(node): #to calculate h(n)
-    if choice == 1:
+    if searchChoice == 1:
         return 0
-    elif choice == 2:
+    elif searchChoice == 2:
         return count_misplaced(node)
-    elif choice ==3:
+    elif searchChoice ==3:
         return find_manhattan(node)
     
 def check_if_visited(b):
@@ -83,11 +82,8 @@ def check_if_visited(b):
         return True
     return False
 
-
 def expand(node, problem_operations):
     add_to_queue = []
-    # print(node.board)
-    # print(problem_operations)
     for o in problem_operations:
         child = node.create_copy()
         i, j = child.blank_pos
@@ -96,6 +92,7 @@ def expand(node, problem_operations):
         child.board[i][j] = child.board[i+o[0]][j+o[1]]
         child.board[i+o[0]][j+o[1]] = t
         child.blank_pos = (i+o[0], j+o[1])
+        child.children=[]
         if check_if_visited(child.board):
             continue
         
@@ -103,7 +100,6 @@ def expand(node, problem_operations):
         gn = find_cost(child)
         hn = find_heuristic(child)
         child.fn = gn + hn
-
         add_to_queue.append(child)
 
     return add_to_queue
@@ -116,21 +112,24 @@ def goal_test(currentState):
                 return False
     return True
 
-def queueing_function(heap, elements):
-    for i in elements:
-        heapq.heappush(heap, i)
-    return heap
 
 def general_search(startNode):
     nodes = []
+    ctr = 0
     heapq.heappush(nodes, startNode)
+    maxq = 1
     while True:
         if len(nodes) == 0:
-            return False
+            return [False, maxq, ctr]
         node = heapq.heappop(nodes)
         if goal_test(node.board):
-            return node
-        nodes = queueing_function(nodes, expand(node, find_problem_operations(node.blank_pos)))
+            return [node, maxq, ctr]
+        
+        merged = heapq.merge(nodes, expand(node, find_problem_operations(node.blank_pos)))
+        nodes = list(merged)
+        heapq.heapify(nodes)
+        ctr += 1
+        maxq = max(maxq, len(nodes))
     
 
 def find_goal_state():
@@ -152,44 +151,94 @@ def find_blank_pos(bState):
     return None
 
 if __name__ == '__main__':
-    choice = 3
-    startState = []
-    print('What are the number of rows/columns in the puzzle?')
-    n = int(input().strip())
+    choice1 = 2
+    searchChoice = 1
+    defaultStates = [[[1, 2, 3], [4, 5, 6], [7, 8, 0]], [[1, 2, 3], [4, 5, 6], [0, 7, 8]], [[1, 2, 3], [5, 0, 6], [4, 7, 8]], [[1, 3, 6], [5, 0, 2], [4, 7, 8]], [[1, 3, 6], [5, 0, 7], [4, 8, 2]], [[1, 6, 7], [5, 0, 3], [4, 8, 2]], [[7, 1, 2], [4, 8, 5], [6, 3, 0]], [[0, 7, 2], [4, 6, 1], [3, 5, 8]]]
     
-    print('Enter n numbers in n rows that represents initial state of the puzzle. Add 0 to indicate blank')
-    for i in range(n):
-        startState.append([int(x) for x in input().strip().split()])
-    
-    goalState = find_goal_state()
-    print('The goal state for this puzzle would be ')
-    print(goalState)
+    while choice1 !=0:
+        print('''Do you want to check with \n1. Default puzzle states\n2. A new puzzle state\n0. Exit\nEnter your choice (0, 1 or 2): ''')
+        choice1 = int(input())
 
-    startNode = TreeNode(startState, find_blank_pos(startState))
-    goalNode = TreeNode(goalState, find_blank_pos(goalState))
-    visited_nodes = set()
-    visited_nodes.add(tuple(tuple(l) for l in startNode.board) )
-    result = general_search(startNode)
-    if result == False:
-        print('No solution')
-    else:
-        find_path(result)
+        if choice1 == 1:
+            print('''Pick an option from below choices:\n1. Try all default states with all search algorithms \n2. Select default state and search algorithm  ''')
+            selection = int(input().strip())
+            n=3
+            goalState = find_goal_state()
+            goalNode = TreeNode(goalState, find_blank_pos(goalState))
+            if selection ==1:
+                solutions = []
+                for startState in defaultStates:
+                    for searchChoice in [1,2,3]:
+                        startNode = TreeNode(startState, find_blank_pos(startState))
+                        visited_nodes = set()
+                        visited_nodes.add(tuple(tuple(l) for l in startNode.board) )
+                        start = time.time()
+                        result, maxq, ctr = general_search(startNode)
+                        end = time.time()
+                        if result == False:
+                            print(str(startState) + 'No solution')
+                        else:
+                            solutions.append([str(maxq), str(result.level), str(ctr), str(end - start)])
+                            print(solutions[-1])
+                print(solutions)
+            elif selection ==2:
+                print("Select difficulty level of default state between 0-7. 0-> easy and 7-> very difficult")
+                index = int(input())
+                startState = defaultStates[index]
+                print('Select type of search')
+                print('''1. Uniform Cost Search\n2. A* Search with misplaced tile \n3. A* Search with manhattan distance\n0. Exit''')
+                searchChoice = int(input())
+                startNode = TreeNode(startState, find_blank_pos(startState))
+                visited_nodes = set()
+                visited_nodes.add(tuple(tuple(l) for l in startNode.board) )
+                start = time.time()
+                result, maxq, ctr = general_search(startNode)
+                end = time.time()
+                if result == False:
+                    print(str(startState) + 'No solution')
+                else:
+                    path = find_path(result)
+                    print('The sequence of steps are')
+                    while path:
+                        print(path.pop().board)
+                    print('Maximum size of queue: '+ str(maxq))
+                    print('Solution Depth: '+ str(result.level))
+                    print('Number of nodes expanded: '+str(ctr))
+                    print('Time taken: '+ str(end - start))
 
-    # print(find_manhattan(startNode, goalNode, n))
-    # print(count_misplaced(startNode, goalNode, n))
-    # print(find_cost(startNode))
-    
-    # while choice !=0:
-    #     print('Select type of search or 0 for exit')
-    #     print(''' 1. Uniform Cost Search
-    #               2. A* Search with misplaced tile 
-    #               3. A* Search with manhattan distance
-    #               0. Exit''')
-    #     choice = int(input())
-
-
-
-
-
-
-    
+        elif choice1 == 2:
+            startState = []
+            print('Disclaimer: You need to provide a valid puzzle')
+            print('What are the number of rows/columns in the puzzle?')
+            n = int(input().strip())
+            
+            print('Enter n numbers in n rows that represents initial state of the puzzle. Add 0 to indicate blank')
+            for i in range(n):
+                startState.append([int(x) for x in input().strip().split()])
+            
+            goalState = find_goal_state()
+            print('The goal state for this puzzle would be ')
+            print(goalState)
+            print('Select type of search')
+            print(''' 1. Uniform Cost Search\n2. A* Search with misplaced tile \n3. A* Search with manhattan distance\n0. Exit''')
+            searchChoice = int(input())
+            startNode = TreeNode(startState, find_blank_pos(startState))
+            goalNode = TreeNode(goalState, find_blank_pos(goalState))
+            visited_nodes = set()
+            visited_nodes.add(tuple(tuple(l) for l in startNode.board) )
+            start = time.time()
+            result, maxq, ctr = general_search(startNode)
+            end = time.time()
+            if result == False:
+                print('No solution')
+            else:
+                path = find_path(result)
+                print('The sequence of steps are')
+                while path:
+                    print(path.pop().board)
+                print('Maximum size of queue: '+ str(maxq))
+                print('Solution Depth: '+ str(result.level))
+                print('Number of nodes expanded: '+str(ctr))
+                print('Time taken: '+ str(end - start))
+        else:
+            break    
